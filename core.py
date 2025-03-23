@@ -1,7 +1,11 @@
 # core.py
 import numpy as np
 from .parameters import validate_params, categorize_wave_regime, k_from_lam, lam_from_k
-from .excursion_vectors import xi_shallow, zeta_shallow, xi_intermediate, zeta_intermediate, xi_deep, zeta_deep
+from .excursion_vectors import (
+    xi_shallow_first, zeta_shallow_first, xi_intermediate_first, zeta_intermediate_first, xi_deep_first, zeta_deep_first,
+    xi_shallow_second, zeta_shallow_second, xi_intermediate_second, zeta_intermediate_second, xi_deep_second, zeta_deep_second
+)
+
 
 def compute_trajectory(a, H, t, x_0, z_0, k=None, lam=None, order="first"):
     """
@@ -40,23 +44,34 @@ def compute_trajectory(a, H, t, x_0, z_0, k=None, lam=None, order="first"):
     if isinstance(t, (int, float)):  # if t is a single value
         t = np.array([t])
     
-    trajectory = np.zeros_like(t)
+    trajectory = np.zeros((len(t), 2))  # Shape (num_timesteps, 2) for (x, z)
     
-    # Compute the particle trajectory based on the wave regime and approximations
-    if wave_regime == "shallow":
-        # Use the shallow water approximations
-        xi = xi_shallow(a, k, H, omega, t, x_0, z_0)
-        zeta = zeta_shallow(a, k, H, omega, t, x_0, z_0)
-    elif wave_regime == "intermediate":
-        # Use the intermediate water approximations
-        xi = xi_intermediate(a, k, H, omega, t, x_0, z_0)
-        zeta = zeta_intermediate(a, k, H, omega, t, x_0, z_0)
-    else:  # deep water
-        # Use the deep water approximations
-        xi = xi_deep(a, k, H, omega, t, x_0, z_0)
-        zeta = zeta_deep(a, k, H, omega, t, x_0, z_0)
+    # Define mappings for wave regime and order
+    wave_functions = {
+        "shallow": {"first": (xi_shallow, zeta_shallow), "second": (xi_shallow, zeta_shallow)},
+        "intermediate": {"first": (xi_intermediate, zeta_intermediate), "second": (xi_intermediate, zeta_intermediate)},
+        "deep": {"first": (xi_deep, zeta_deep), "second": (xi_deep, zeta_deep)},
+    }
+
+    # Ensure the order parameter is valid
+    if order not in ["first", "second"]:
+        raise ValueError("Invalid order. Must be 'first' or 'second'.")
+
+    # Get the correct functions based on the wave regime and order
+    xi_func, zeta_func = wave_functions[wave_regime][order]
+
+    # Compute trajectory using the selected functions
+    xi = xi_func(a, k, H, omega, t, x_0, z_0)
+    zeta = zeta_func(a, k, H, omega, t, x_0, z_0)
+
+    # Store results in a trajectory array
+    trajectory = np.zeros((len(t), 2))
+    trajectory[:, 0] = xi  # x positions
+    trajectory[:, 1] = zeta  # z positions
+
     
-    # The trajectory is the combination of xi and zeta
-    trajectory = xi + zeta
+    trajectory[:, 0] = x_p # Assign x positions
+    trajectory[:, 1] = z_p  # Assign z positions
+
     
     return trajectory
