@@ -1,7 +1,7 @@
 import numpy as np
 import math
 
-def validate_params(a, H, t, x_0, z_0, order, k=None, lam=None):
+def validate_params(a, H, order, k=None, lam=None):
     """
     Validate the input parameters for the wave and particle calculations.
 
@@ -24,24 +24,26 @@ def validate_params(a, H, t, x_0, z_0, order, k=None, lam=None):
     if a is None:
         raise ValueError("Wave amplitude (a) must be provided and positive.")
     if not isinstance(a, (int, float)) or a <= 0:
-        raise ValueError("Wave amplitude (a) must be a positive float.")
+        raise ValueError("Wave amplitude (a) must be a positive number.")
 
     # Ensure at least one of k or lam is provided
     if k is None and lam is None:
-        raise ValueError("Either wavenumber (k) or wavelength (lambda) must be provided.")
+        raise ValueError("At least wavenumber (k) or wavelength (lambda) must be provided.")
 
     # If lam is provided, calculate k later
-    if lam is not None and not isinstance(lam, (int, float)) or lam <= 0:
-        raise ValueError("Wavelength (lambda) must be a positive float.")
+    if lam is not None:
+        if not isinstance(lam, (int, float)) or lam <= 0:
+            raise ValueError("Wavelength (lambda) must be a positive number.")
     
     # If k is provided, calculate lam later
-    if k is not None and not isinstance(k, (int, float)) or k <= 0:
-        raise ValueError("Wavenumber (k) must be a positive float (1/m).")
+    if k is not None:
+        if not isinstance(k, (int, float)) or k <= 0:
+            raise ValueError("Wavenumber (k) must be a positive number (1/m).")
     
     # If both k and lam are provided, check that they satisfy the relation k = 2*pi/lam
     if k is not None and lam is not None:
         if not math.isclose(k, 2 * math.pi / lam, rel_tol=1e-5):
-            raise ValueError(f"Provided k and lambda do not satisfy the relation k = 2*pi/lam. k = {k}, lambda = {lam}")
+            raise ValueError(f"k = {k} and lambda = {lam} do not satisfy the relation k = 2π/λ.")
 
     # Check if H is provided and valid
     if H is None:
@@ -50,27 +52,27 @@ def validate_params(a, H, t, x_0, z_0, order, k=None, lam=None):
         raise ValueError("Water depth (H) must be a positive float.")
 
     # Check if t is provided and valid (either a single float or an array of floats)
-    if t is None:
-        raise ValueError("Time (t) must be provided and valid.")
-    if not isinstance(t, (int, float, np.ndarray)):
-        raise TypeError("Time (t) must be a float or array of floats.")
-    if isinstance(t, (int, float)) and t < 0:
-        raise ValueError("Time (t) must be non-negative.")
-    elif isinstance(t, np.ndarray) and np.any(t < 0):
-        raise ValueError("All time values in array must be non-negative.")
+    # if t is None:
+    #     raise ValueError("Time(s) (t) must be provided and valid.")
+    # if not isinstance(t, (int, float, np.ndarray)):
+    #     raise TypeError("Time(s) (t) must be a float or array of floats.")
+    # if isinstance(t, (int, float)) and t < 0:
+    #     raise ValueError("Time (t) must be non-negative.")
+    # elif isinstance(t, np.ndarray) and np.any(t < 0):
+    #     raise ValueError("All time values in array must be non-negative.")
 
     # Check if x_0 is provided and valid
-    if x_0 is None:
-        raise ValueError("Mean x position (x_0) must be provided and valid.")
-    if not isinstance(x_0, (int, float)):
-        raise TypeError("Mean x position (x_0) must be a float.")
+    # if x_0 is None:
+    #     raise ValueError("Mean x position (x_0) must be provided and valid.")
+    # if not isinstance(x_0, (int, float)):
+    #     raise TypeError("Mean x position (x_0) must be a float.")
     
     # Check if z_0 is provided and valid
-    if z_0 is None:
-        raise ValueError("Mean z position (z_0) must be provided and valid.")
-    if not isinstance(z_0, (int, float)):
-        raise TypeError("Mean z position (z_0) must be a float.")
-    
+    # if z_0 is None:
+    #     raise ValueError("Mean z position (z_0) must be provided and valid.")
+    # if not isinstance(z_0, (int, float)):
+    #     raise TypeError("Mean z position (z_0) must be a float.")
+    # 
     if order not in ["first", "second"]:
         raise ValueError("Parameter 'order' must be either 'first' or 'second'.")
 
@@ -107,3 +109,15 @@ def k_from_lam(lam):
 
 def lam_from_k(k):
     return 2 * np.pi / k
+
+def wave_disp_relation(k, H, wave_regime):
+    g = 9.81 # m/s
+
+    if wave_regime is "shallow":
+        omega = math.sqrt(g*k)
+    elif wave_regime is "intermediate":
+        omega = math.sqrt(g*k*np.tanh(k*H))
+    else:
+        omega = k*math.sqrt(g*H)
+
+    return omega
