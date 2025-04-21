@@ -43,7 +43,10 @@ def random_mean_pos(N, x_start, x_end, H):
     z_0 = np.random.uniform(-H, 0, N)
     return x_0, z_0
 
-def build_dataset(x_0=None, z_0=None, time=None, grid=False, random_pos=False, N=None, x_start=None, x_end=None, H=None):
+import numpy as np
+import xarray as xr
+
+def build_dataset(x_0=None, z_0=None, time=None, grid=False, random_pos=False, N=None, x_min=None, x_max=None, H_particles=None):
     """
     Builds an xarray Dataset with particle trajectories.
 
@@ -54,30 +57,48 @@ def build_dataset(x_0=None, z_0=None, time=None, grid=False, random_pos=False, N
     - grid: If True, create a meshgrid for x_0 and z_0. If False, treat x_0 and z_0 as 1D arrays.
     - random_pos: If True, generate random positions instead of using x_0, z_0.
     - N: Number of random particles (required if random_pos=True).
-    - x_start: Start of x range for random positions (required if random_pos=True).
-    - x_end: End of x range for random positions (required if random_pos=True).
-    - H: Maximum depth for random z positions (required if random_pos=True).
+    - x_min: Start of x range for random positions (required if random_pos=True).
+    - x_max: End of x range for random positions (required if random_pos=True).
+    - H_particles: Maximum depth for random z positions (required if random_pos=True).
 
     Returns:
     - ds: xarray Dataset containing the particle data.
     """
     
+    # If random_pos is True, generate random positions
     if random_pos:
-        if None in [N, x_start, x_end, H]:
-            raise ValueError("When random_pos=True, N, x_start, x_end, and H must be provided.")
-        x_0, z_0 = random_mean_pos(N, x_start, x_end, H)
+        if None in [N, x_min, x_max, H_particles]:
+            raise ValueError("When random_pos=True, N, x_min, x_max, and H_particles must be provided.")
+        # Generate random positions
+        x_rand, z_rand = random_mean_pos(N, x_min, x_max, H_particles)
+        
+        # If x_0 and z_0 are provided, concatenate them with the random positions
+        if x_0 is not None and z_0 is not None:
+            if len(x_0) != len(z_0):
+                raise ValueError("x_0 and z_0 must have the same length.")
+            # Concatenate the provided x_0, z_0 with the random values
+            x_0 = np.concatenate([x_0, x_rand])
+            z_0 = np.concatenate([z_0, z_rand])
+        else:
+            # Only use the random positions
+            x_0, z_0 = x_rand, z_rand
 
     else:
+        # If random_pos is False, x_0 and z_0 must be provided
         if x_0 is None or z_0 is None:
             raise ValueError("When random_pos=False, x_0 and z_0 must be provided.")
         
+        # Validate that x_0 and z_0 have the same length
+        if len(x_0) != len(z_0):
+            raise ValueError("x_0 and z_0 must have the same length when grid=False.")
+        
+        # If grid is True, create meshgrid and flatten
         if grid:
             x_0, z_0 = np.meshgrid(x_0, z_0)
             x_0 = x_0.flatten()
             z_0 = z_0.flatten()
-        elif len(x_0) != len(z_0):
-            raise ValueError("x_0 and z_0 must have the same length when grid=False.")
 
+    # Build the xarray Dataset
     ds = xr.Dataset(
         {
             "x_0": ("particle", x_0),
@@ -134,8 +155,12 @@ def compute_trajectories(ds, **kwargs):
         dask='allowed'  # Optional: Enable parallelism with Dask
     )
 
-    min = int(ds.x_p.min())-1
-    max = int(ds.x_p.max())+1
+    if order == 'second':
+        min = int(ds.x_p.min())-1
+        max = int(ds.x_p.max())+1
+    else:
+        min = int(ds.x_0.min())-5
+        max = int(ds.x_0.max())+5
 
     x_eta = np.linspace(min, max, int((max-min)/lam * 32))
     # print(x_eta)
